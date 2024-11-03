@@ -23,13 +23,14 @@ def return_field_amp(Ve, Vg):
     ve = Ve / np.linalg.norm(Ve)
 
 
-    Px = np.kron(np.array([[1, 0], [0, -1]]), np.identity(2))
-    Py = np.kron(np.array([[0, -1], [-1, 0]]), np.identity(2))
-    Pz = np.kron(2 * np.array([[1, 0], [0, 1]]), np.identity(2))
+    Px = np.kron(np.array([[0, 1], [1, 0]]), np.identity(2))
+    Py = np.kron(np.array([[0, -1j], [1j, 0]]), np.identity(2))
+    Pz = np.kron(2* np.array([[1, 0], [0, 1]]), np.identity(2))
 
     Ax = np.conj(vg) @ Px @ ve
     Ay = np.conj(vg) @ Py @ ve
     Az = np.conj(vg) @ Pz @ ve
+
 
     return Ax, Ay, Az
 
@@ -82,11 +83,12 @@ def calculate_final_field(Ax_l, Ay_l, phi):
     # First matrix [1 0; 0 0]
     M1 = np.array([[1, 0],
                    [0, 0]])
-
+    #phi = phi/2
     # Second matrix [cos(2φ) sin(2φ); sin(2φ) -cos(2φ)]
-    M2 = np.array([[np.cos(2 * phi), np.sin(2 * phi)],
-                   [np.sin(2 * phi), -np.cos(2 * phi)]])
-
+    # M2 = np.array([[np.cos(2 * phi), np.sin(2 * phi)],
+    #                [np.sin(2 * phi), -np.cos(2 * phi)]])
+    M2 = np.array([[np.cos(phi), np.sin(phi)],
+                   [np.sin(phi), -np.cos(phi)]])
     # Input vector
     A_l = np.array([Ax_l, Ay_l])
 
@@ -96,7 +98,7 @@ def calculate_final_field(Ax_l, Ay_l, phi):
     # Return the final coordinates
     return result[0], result[1]
 def scan_polarisation(Ax, Ay, Az):
-    phi_values = np.linspace(0, 2 * np.pi, 360)
+    phi_values = np.linspace(0, 2*np.pi, 360)
     magnitudes = []
 
     # Calculate magnitude for each phi
@@ -108,7 +110,7 @@ def scan_polarisation(Ax, Ay, Az):
         Ax_f, Ay_f = calculate_final_field(Ax_l, Ay_l, phi)
 
         # Calculate magnitude
-        magnitude = np.sqrt(np.abs(Ax_f) ** 2 + np.abs(Ay_f) ** 2)
+        magnitude = np.abs(Ax_f) ** 2 + np.abs(Ay_f) ** 2
         magnitudes.append(magnitude)
     return phi_values, magnitudes
 
@@ -134,6 +136,6 @@ def plot_magnitude_polar(phi_values, magnitudes):
     ax.grid(True)
     plt.show()
 
-x,y = 2+3j, 1.5+2j
-print(x**2+y**2)
-print(np.sqrt(x**2+y**2))
+def inner_product(v1,v2):
+    return np.dot(v1, v2)
+

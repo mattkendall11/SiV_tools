@@ -86,5 +86,3 @@ def get_energy_spectra(l, x, y, f, B, strain = False):
     eigenvalues, eigenvectors = eigh(H)
 
     return eigenvalues, eigenvectors
-
-

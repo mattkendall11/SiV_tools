@@ -1,2 +1,2 @@
-# SiV_tools
-tools for SiV calculations
+# SnV_tools
+tools for SnV calculations

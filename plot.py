@@ -1,42 +1,100 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from model import get_energy_spectra
-from transitions import get_magnitude_from_vector, plot_magnitude_polar
-'''
-define params
-'''
-# Constants
-lg = 815e9        # Spin-orbit coupling in ground state (Hz)
-lu = 2355e9       # Spin-orbit coupling in excited state (Hz)
-x_g, y_g = 65e9, 0  # Jahn-Teller coupling (ground state) (Hz)
-x_u, y_u = 855e9, 0  # Jahn-Teller coupling (excited state) (Hz)
-fg, fu = 0.15, 0.15  # Quenching factors for ground and excited states
+import h5py
+import datetime
+from transitions import transitioncompute
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import multiprocessing
+from tqdm import tqdm
 
-# Strain parameters
-strain_params_strained = {'α_g': -238e9, 'β_g': 238e9, 'δ_g': 0, 'α_u': -76e9, 'β_u': 76e9, 'δ_u': 0}
 
-# Magnetic constants
+def compute_transition_for_point(args):
+    """
+    Compute transition parameters for a single point in parameter space
+    """
+    i, j, k, Bx, By, Bz = args
 
-#B-field
-B = [0,0,0]
-B_values = np.arange(0,9.1,0.1)
-Ee_values = np.zeros((4, len(B_values)))
-Eg_values = np.zeros((4, len(B_values)))
-for i in range(len(B_values)):
-    B = [1,1,B_values[i]]
-    Ee, Ve = get_energy_spectra(lu, x_u, y_u, fu, B)
-    Eg, Vg = get_energy_spectra(lg,x_g,y_g,fg,B)
-    Ee_values[:,i] = Ee
-    Eg_values[:,i] = Eg
+    # Create transition model for this B field configuration
+    model = transitioncompute([Bx, By, Bz])
 
-f ,(ax1,ax2) = plt.subplots(2,1, sharex=True)
-for i in range(4):
-    ax1.plot(B_values, Ee_values[i,:], color = 'r')
+    # Return all computed values to be reassembled later
+    return (
+        i, j, k,
+        model.return_levels(),  # energy levels
+        model.return_vectors(),  # eigenvectors
+        model.get_c_magnitudes()  # c magnitudes
+    )
 
-    ax2.plot(B_values, Eg_values[i,:], color = 'b')
-ax1.set_title('excited state')
-ax2.set_title('ground state')
-plt.xlabel('Bz (T)')
-plt.suptitle('E-level response to Bz, Bx=By=1T')
-plt.show()
+
+def compute_transitions(resolution=100):
+    # Parameter setup
+    B_values = np.linspace(0, 5, resolution)
+    theta_values = np.linspace(0, np.pi, resolution)
+    phi_values = np.linspace(0, 2 * np.pi, resolution)
+
+    # Create meshgrids
+    B_grid, theta_grid, phi_grid = np.meshgrid(B_values, theta_values, phi_values)
+
+    # Precompute Cartesian coordinates
+    Bx = B_grid * np.sin(theta_grid) * np.cos(phi_grid)
+    By = B_grid * np.sin(theta_grid) * np.sin(phi_grid)
+    Bz = B_grid * np.cos(theta_grid)
+
+    # Prepare arguments for parallel computation
+    compute_args = [
+        (i, j, k, Bx[i, j, k], By[i, j, k], Bz[i, j, k])
+        for i in range(len(theta_values))
+        for j in range(len(phi_values))
+        for k in range(len(B_values))
+    ]
+
+    # Parallel computation with progress tracking
+    num_cores = max(multiprocessing.cpu_count() - 1, 1)
+    results = []
+
+    with ProcessPoolExecutor(max_workers=num_cores) as executor:
+        # Submit all tasks
+        futures = [executor.submit(compute_transition_for_point, args) for args in compute_args]
+
+        # Track progress with tqdm
+        for future in tqdm(as_completed(futures), total=len(futures), desc="Computing Transitions"):
+            results.append(future.result())
+
+    # Preallocate result arrays
+    energy_ground = np.zeros((len(theta_values), len(phi_values), len(B_values), 4))
+    energy_excited = np.zeros((len(theta_values), len(phi_values), len(B_values), 4))
+    eigenvectors_ground = np.zeros((len(theta_values), len(phi_values), len(B_values), 4, 4), dtype=complex)
+    eigenvectors_excited = np.zeros((len(theta_values), len(phi_values), len(B_values), 4, 4), dtype=complex)
+    c_magnitudes = np.zeros_like(B_grid)
+
+    # Populate results
+    for i, j, k, levels, vectors, c_mag in results:
+        energy_ground[i, j, k, :] = levels[0]
+        energy_excited[i, j, k, :] = levels[1]
+        eigenvectors_ground[i, j, k, :, :] = vectors[0]
+        eigenvectors_excited[i, j, k, :, :] = vectors[1]
+        c_magnitudes[i, j, k] = c_mag
+
+    # Save results
+    timestamp = datetime.datetime.now().strftime("%m-%d_%H-%M")
+    with h5py.File(f'data_{resolution}_{timestamp}.h5', 'w') as f:
+        f.create_dataset('B_values', data=B_values)
+        f.create_dataset('theta_values', data=theta_values)
+        f.create_dataset('phi_values', data=phi_values)
+        f.create_dataset('c_magnitudes', data=c_magnitudes)
+
+        grp_ground = f.create_group('ground_state')
+        grp_ground.create_dataset('energy_levels', data=energy_ground)
+        grp_ground.create_dataset('eigenvectors', data=eigenvectors_ground)
+
+        grp_excited = f.create_group('excited_state')
+        grp_excited.create_dataset('energy_levels', data=energy_excited)
+        grp_excited.create_dataset('eigenvectors', data=eigenvectors_excited)
+
+    return B_values, theta_values, phi_values
+
+
+# Usage
+if __name__ == '__main__':
+    compute_transitions()
+
 

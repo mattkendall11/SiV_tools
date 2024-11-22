@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/SiV_tools.iml" filepath="$PROJECT_DIR$/.idea/SiV_tools.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/SnV_tools.iml" filepath="$PROJECT_DIR$/.idea/SnV_tools.iml" />
     </modules>
   </component>
 </project>

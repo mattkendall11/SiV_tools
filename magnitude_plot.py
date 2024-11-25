@@ -4,10 +4,9 @@ import h5py
 from tqdm.auto import tqdm
 import datetime
 
-resolution = 100
+resolution = 50
 B_values = np.linspace(0,5,resolution)
-print(B_values)
-theta_values = np.linspace(0, np.pi, resolution)
+theta_values = np.linspace(np.pi/2-0.001, np.pi/2+0.001, resolution)
 phi_values = np.linspace(0, 2*np.pi, resolution)
 
 B_grid, theta_grid, phi_grid = np.meshgrid(B_values, theta_values, phi_values)
@@ -36,7 +35,11 @@ for i in tqdm(range(len(theta_values))):
             eigenvectors_ground[i, j, k, :, :], eigenvectors_excited[i, j, k, :, :] = model.return_vectors()
 
             # Calculate |c|
-            c_magnitudes[i, j, k] = model.get_c_magnitudes()
+            
+            c = model.get_c_magnitudes()
+            c_magnitudes[i, j, k] = c
+            print(c)
+
 
 timestamp = datetime.datetime.now().strftime("%m-%d_%H-%M")
 # Save data
